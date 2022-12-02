@@ -1,0 +1,132 @@
+---
+title: "HW7 Zimeng Liu"
+author: "Zimeng Liu"
+date: "2022-11-08"
+output: word_document
+---
+
+import dataset
+```{r}
+library(urca)
+library(dplyr)
+library(MASS)
+library(leaps)
+library(glmnet)
+library(pROC)
+creditT <- read.csv('C:\\Users\\Zimeng\\OneDrive - Dickinson College\\Desktop\\Dickinson\\7th\\DATA 300\\HW\\credit_train.csv')
+# View(creditT)
+```
+Q1. We kept 5 categorical variables and 17 numerical variables in the dataset at the end, since the other categorical variables are unrelated to Credit_Score or the unique values of the variable are too many to deal with.
+```{r}
+creditT <- creditT %>% dplyr::select(-X, -ID, -Customer_ID, -Name, -SSN, -Type_of_Loan, -Credit_History_Age)
+# View(creditT)
+
+sapply(creditT, class)
+
+tCate <- c("Month", "Occupation",  "Credit_Mix", "Payment_of_Min_Amount", "Payment_Behaviour")
+
+creditT[, which(!colnames(creditT) %in% tCate)] <- sapply(creditT[, which(!colnames(creditT) %in% tCate)], as.numeric)
+
+creditT <- na.omit(creditT)
+
+fun_countunique <- function(x){
+  return(length(unique(x)))
+}
+
+sapply(creditT[, tCate], FUN = fun_countunique)
+```
+Q2.
+```{r}
+creditT_glm <- glm(as.factor(Credit_Score)~., creditT, family = "binomial")
+# summary(creditT_glm)
+```
+Q3.
+a. The R-squared statistic is steadily decreasing while the number of variables contained is increasing. R-squared static cannot help me to find the optimal variable combination, because it always tends to increase as the number of predictors increases.
+c. The optimal number of variables is 6, because Adjusted R-squared reaches the highest point and Cp, AIC, and BIC reach the lowest point when the number of variables equals to 6.
+d. The optimal variable combination is Delay_from_due_date + Credit_MixGood + Outstanding_Debt + Payment_of_Min_AmountNo + Payment_of_Min_AmountYes + Payment_BehaviourLow_spent_Small_value_payments.
+```{r}
+regfit <- regsubsets(as.factor(Credit_Score)~., creditT, nvmax=6)
+sumRegfit <- summary(regfit)
+sumRegfit$rsq
+
+par(mfrow = c(2,2))
+plot(sumRegfit$adjr2, xlab = "Number of Variables", ylab = "Adjusted R-squared", type = "l")
+plot(sumRegfit$cp, xlab = "Number of Variables", ylab = "Cp", type = "l")
+plot(sumRegfit$cp, xlab = "Number of Variables", ylab = "AIC", type = "l")
+plot(sumRegfit$bic, xlab = "Number of Variables", ylab = "BIC", type = "l")
+
+options(scipen=200)
+coef(regfit, 6)
+```
+Q4.
+```{r}
+nullreg <- lm(Credit_Score~1., creditT)
+forreg <- stepAIC(nullreg, direction = "forward", scope = list(upper = creditT_glm, lower = nullreg), trace = FALSE)
+summary(forreg)
+backreg <- stepAIC(nullreg, direction = "backward", scope = list(upper = creditT_glm, lower = nullreg), trace = FALSE)
+summary(backreg)
+```
+Q5. We can compare the Cp, AIC, BIC, and Adjusted R-squared of the 3 models. We always perfer the one with lower Cp, AIC, and BIC and higher Adjusted R-squared.
+
+Q6.
+```{r}
+modelfit <- glm(as.factor(Credit_Score)~Delay_from_due_date + Credit_Mix + Outstanding_Debt + Payment_of_Min_Amount + Payment_Behaviour, creditT, family = "binomial")
+summary(modelfit)
+```
+Q7. 
+a. The results show that smaller lambdas tend correspond to larger coefficients, because a smaller lambda signals a lighter penalty on estimations.
+b.  The results show that larger lambdas tend correspond to more 0 coefficients, because a larger lambda signals a heavier penalty on estimations.
+```{r}
+x <- model.matrix(Credit_Score~., creditT)[,-1]
+y <- creditT$Credit_Score
+grid1 <- 10^seq(1, -2, length = 10)
+grid1
+ridge <- glmnet(x, y, alpha = 0, lambda = grid1)
+# coef(ridge)
+
+grid2 <- 10^seq(3, -2, length = 10)
+grid2
+lasso <- glmnet(x, y, alpha = 1, lambda = grid2)
+# coef(lasso)
+```
+Q8.
+```{r}
+cv.glmnet(x, y, alpha = 0)
+cv.ridge <- glmnet(x, y, alpha = 0, lambda = 0.02883)
+coef(cv.ridge)
+```
+Q9.
+```{r}
+cv.glmnet(x, y, alpha = 1)
+cv.lasso <- glmnet(x, y, alpha = 1, lambda = 0.000355)
+coef(cv.lasso)
+```
+Q10. The logistic regression model with all relevant variables (the yellow one) probably is the best one.
+```{r}
+creditTT <- read.csv('C:\\Users\\Zimeng\\OneDrive - Dickinson College\\Desktop\\Dickinson\\7th\\DATA 300\\HW\\credit_test.csv')
+creditTT <- creditTT %>% dplyr::select(-X, -ID, -Customer_ID, -Name, -SSN, -Type_of_Loan, -Credit_History_Age)
+creditTT[, which(!colnames(creditTT) %in% tCate)] <- sapply(creditTT[, which(!colnames(creditTT) %in% tCate)], as.numeric)
+creditTT <- na.omit(creditTT)
+
+pred1 <- predict(creditT_glm, creditTT)
+pred2 <- predict(modelfit, creditTT)
+x3 <- model.matrix(Credit_Score~., creditTT)[,-1]
+pred3 <- predict(cv.ridge, s = 0.02883, newx = x3)
+pred4 <- predict(cv.lasso, s = 0.000355, newx = x3)
+
+roc1 <- roc(creditTT$Credit_Score ~ pred1)
+roc2 <- roc(creditTT$Credit_Score ~ pred2)
+roc3 <- roc(creditTT$Credit_Score ~ pred3)
+roc4 <- roc(creditTT$Credit_Score ~ pred4)
+
+plot(roc1,col = "yellow")
+plot(roc2, add = TRUE, col = "blue")
+plot(roc2, add = TRUE, col = "green")
+plot(roc2, add = TRUE, col = "red")
+```
+
+
+
+
+
+

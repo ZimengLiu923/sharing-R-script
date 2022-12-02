@@ -1,0 +1,280 @@
+---
+title: "HW6"
+author: "Zimeng Liu"
+date: "2022-10-27"
+output: word_document
+---
+
+Q1
+The accuracy on the validation set is 0.7745016.
+
+import data set
+```{r}
+library(urca)
+library(dplyr)
+creditTrain <- read.csv('C:\\Users\\Zimeng\\OneDrive - Dickinson College\\Desktop\\Dickinson\\7th\\DATA 300\\HW\\credit_train.csv')
+is.numeric(creditTrain$Credit_Score)
+creditTrain <- filter(creditTrain, creditTrain$Credit_Score %in% c(0,1))
+```
+choose predictors and convert them into numeric variables
+```{r}
+cor(creditTrain$Outstanding_Debt, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Annual_Income)
+creditTrain$Annual_Income <- as.numeric(creditTrain$Annual_Income)
+is.numeric(creditTrain$Annual_Income)
+cor(creditTrain$Annual_Income, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Monthly_Balance)
+creditTrain$Monthly_Balance <- as.numeric(creditTrain$Monthly_Balance)
+cor(creditTrain$Monthly_Balance, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Amount_invested_monthly)
+cor(creditTrain$Amount_invested_monthly, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Total_EMI_per_month)
+cor(creditTrain$Total_EMI_per_month, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Credit_Utilization_Ratio)
+cor(creditTrain$Credit_Utilization_Ratio, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Num_Credit_Inquiries)
+cor(creditTrain$Num_Credit_Inquiries, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Changed_Credit_Limit)
+creditTrain$Changed_Credit_Limit <- as.numeric(creditTrain$Changed_Credit_Limit)
+cor(creditTrain$Changed_Credit_Limit, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Num_of_Delayed_Payment)
+creditTrain$Num_of_Delayed_Payment <- as.numeric(creditTrain$Num_of_Delayed_Payment)
+cor(creditTrain$Num_of_Delayed_Payment, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Delay_from_due_date)
+cor(creditTrain$Delay_from_due_date, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Num_of_Loan)
+creditTrain$Num_of_Loan <- as.numeric(creditTrain$Num_of_Loan)
+cor(creditTrain$Num_of_Loan, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Interest_Rate)
+cor(creditTrain$Interest_Rate, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Num_Credit_Card)
+cor(creditTrain$Num_Credit_Card, creditTrain$Credit_Score)
+
+is.numeric(creditTrain$Num_Bank_Accounts)
+cor(creditTrain$Num_Bank_Accounts, creditTrain$Credit_Score)
+
+creditTrain <- na.omit(creditTrain)
+```
+divide the dataset into training & validation
+```{r}
+set.seed(111)
+sample <- sample(c(TRUE, FALSE), nrow(creditTrain), replace=TRUE, prob=c(0.7,0.3))
+train <- creditTrain[sample, ]
+validation <- creditTrain[!sample, ]
+```
+build a logistic regression model by using glm()
+```{r}
+options(scipen=200)
+modelQ1 <- glm(as.factor(Credit_Score) ~ Outstanding_Debt + Amount_invested_monthly + Credit_Utilization_Ratio + Num_Credit_Inquiries + Delay_from_due_date + Num_Bank_Accounts, family = "binomial", data = train)
+# summary(modelQ1)
+```
+use the threshold in HW5 which is 0.7
+```{r}
+predQ1 <- predict(modelQ1, validation, type = "response")
+summary(predQ1)
+predQ1_class <- ifelse(predQ1 > 0.7, 1, 0)
+confu <- table(validation$Credit_Score, predQ1_class)
+confu
+acc <- (confu[1,1]+confu[2,2])/length(validation$Credit_Score)
+acc
+```
+Q2
+The average cross-validation accuracy across the 5 folders is 0.7710666.
+```{r}
+library(ggplot2)
+library(caret)
+
+k <- 5
+set.seed(111)
+folds <- createFolds(creditTrain$Credit_Score, k)
+accList <- 0
+
+for (i in 1:5){
+  validationi <- creditTrain[folds[[i]],]
+  traini <- creditTrain[-folds[[i]], ]
+  modeli <- glm(as.factor(Credit_Score) ~ Outstanding_Debt + Amount_invested_monthly + Credit_Utilization_Ratio + Num_Credit_Inquiries + Delay_from_due_date + Num_Bank_Accounts, family = "binomial", data = traini)
+  predi <- predict(object = modeli, newdata = validationi, type = "response")
+  predi_class <- ifelse(predi > 0.7, 1, 0)
+  confui <- table(validationi$Credit_Score, predi_class)
+  acci <- (confui[1,1]+confui[2,2])/length(validationi$Credit_Score)
+  accList <- c(accList, acci)
+}
+accList <- accList[-1]
+mean(accList)
+```
+Q3
+The average cross-validation accuracy across the 10 folds is 0.7707135.
+```{r}
+library(groupdata2)
+
+k <- 10
+set.seed(111)
+creditTrain <- fold(creditTrain, k, cat_col = "Credit_Score", handle_existing_fold_cols = "remove")
+creditTrain <- as.data.frame(creditTrain)
+accList <- 0
+
+for (i in 1:10){
+  validationi <- creditTrain[creditTrain$.folds == i,]
+  traini <- creditTrain[creditTrain$.folds != i, ]
+  modeli <- glm(as.factor(Credit_Score) ~ Outstanding_Debt + Amount_invested_monthly + Credit_Utilization_Ratio + Num_Credit_Inquiries + Delay_from_due_date + Num_Bank_Accounts, family = "binomial", data = traini)
+  predi <- predict(object = modeli, newdata = validationi, type = "response")
+  predi_class <- ifelse(predi > 0.7, 1, 0)
+  confui <- table(validationi$Credit_Score, predi_class)
+  acc <- (confui[1,1]+confui[2,2])/length(validationi$Credit_Score)
+  accList <- c(accList, acc)
+}
+accList <- accList[-1]
+mean(accList)
+```
+Q4
+
+If I were to do a Leave-one-out cross validation, I will change the k to the number of rows of creditTrain dataset. The running time should be much longer, since R need to compute the whole process for each single record.
+
+Q5
+The measure of Q3 (10 folds) gives the best approximation to this testset, since it gets the highest accuracy, which is 0.7598539, on the validation set.
+
+import credit_test.csv dataset
+```{r}
+creditTest <- read.csv('C:\\Users\\Zimeng\\OneDrive - Dickinson College\\Desktop\\Dickinson\\7th\\DATA 300\\HW\\credit_test.csv')
+is.numeric(creditTest$Credit_Score)
+creditTest <- filter(creditTest, creditTest$Credit_Score %in% c(0,1))
+
+is.numeric(creditTest$Annual_Income)
+creditTest$Annual_Income <- as.numeric(creditTest$Annual_Income)
+is.numeric(creditTest$Annual_Income)
+is.numeric(creditTest$Monthly_Balance)
+creditTest$Monthly_Balance <- as.numeric(creditTest$Monthly_Balance)
+is.numeric(creditTest$Monthly_Balance)
+is.numeric(creditTest$Amount_invested_monthly)
+is.numeric(creditTest$Total_EMI_per_month)
+is.numeric(creditTest$Credit_Utilization_Ratio)
+is.numeric(creditTest$Num_Credit_Inquiries)
+is.numeric(creditTest$Changed_Credit_Limit)
+creditTest$Changed_Credit_Limit <- as.numeric(creditTest$Changed_Credit_Limit)
+is.numeric(creditTest$Num_of_Delayed_Payment)
+creditTest$Num_of_Delayed_Payment <- as.numeric(creditTest$Num_of_Delayed_Payment)
+is.numeric(creditTest$Delay_from_due_date)
+is.numeric(creditTest$Num_of_Loan)
+creditTest$Num_of_Loan <- as.numeric(creditTest$Num_of_Loan)
+is.numeric(creditTest$Interest_Rate)
+is.numeric(creditTest$Num_Credit_Card)
+is.numeric(creditTest$Num_Bank_Accounts)
+
+creditTest <- na.omit(creditTest)
+```
+the accuracy using method of Q1 is 0.7523132
+```{r}
+set.seed(111)
+sample <- sample(c(TRUE, FALSE), nrow(creditTest), replace=TRUE, prob=c(0.7,0.3))
+train <- creditTest[sample, ]
+validation <- creditTest[!sample, ]
+
+options(scipen=200)
+modelQ1 <- glm(as.factor(Credit_Score) ~ Outstanding_Debt + Amount_invested_monthly + Credit_Utilization_Ratio + Num_Credit_Inquiries + Delay_from_due_date + Num_Bank_Accounts, family = "binomial", data = train)
+
+predQ1 <- predict(modelQ1, validation, type = "response")
+summary(predQ1)
+predQ1_class <- ifelse(predQ1 > 0.7, 1, 0)
+confu <- table(validation$Credit_Score, predQ1_class)
+confu
+acc <- (confu[1,1]+confu[2,2])/length(validation$Credit_Score)
+acc
+```
+the accuracy using method of Q2 is 0.7586231
+```{r}
+k <- 5
+set.seed(111)
+folds <- createFolds(creditTest$Credit_Score, k)
+accList <- 0
+
+for (i in 1:5){
+  validationi <- creditTest[folds[[i]],]
+  traini <- creditTest[-folds[[i]], ]
+  modeli <- glm(as.factor(Credit_Score) ~ Outstanding_Debt + Amount_invested_monthly + Credit_Utilization_Ratio + Num_Credit_Inquiries + Delay_from_due_date + Num_Bank_Accounts, family = "binomial", data = traini)
+  predi <- predict(object = modeli, newdata = validationi, type = "response")
+  predi_class <- ifelse(predi > 0.7, 1, 0)
+  confui <- table(validationi$Credit_Score, predi_class)
+  acci <- (confui[1,1]+confui[2,2])/length(validationi$Credit_Score)
+  accList <- c(accList, acci)
+}
+accList <- accList[-1]
+mean(accList)
+```
+the accuracy using method of Q3 is 0.7598539.
+```{r}
+k <- 10
+set.seed(111)
+creditTest <- fold(creditTest, k, cat_col = "Credit_Score", handle_existing_fold_cols = "remove")
+creditTest <- as.data.frame(creditTest)
+accList <- 0
+
+for (i in 1:10){
+  validationi <- creditTest[creditTest$.folds == i,]
+  traini <- creditTest[creditTest$.folds != i, ]
+  modeli <- glm(as.factor(Credit_Score) ~ Outstanding_Debt + Amount_invested_monthly + Credit_Utilization_Ratio + Num_Credit_Inquiries + Delay_from_due_date + Num_Bank_Accounts, family = "binomial", data = traini)
+  predi <- predict(object = modeli, newdata = validationi, type = "response")
+  predi_class <- ifelse(predi > 0.7, 1, 0)
+  confui <- table(validationi$Credit_Score, predi_class)
+  acc <- (confui[1,1]+confui[2,2])/length(validationi$Credit_Score)
+  accList <- c(accList, acc)
+}
+accList <- accList[-1]
+mean(accList)
+```
+Q6
+The difference is that the confusion matrix if the oversampling dataset is it only has false negative shown. It is probably caused by fixing the imbalanced problem by oversampling it by selecting the same number of Good records as Poor records. 
+```{r}
+oversampling <- creditTest[sample(which(creditTest$Credit_Score == 1), length(which((creditTest$Credit_Score == 0))), replace = TRUE),]
+
+set.seed(111)
+sample <- sample(c(TRUE, FALSE), nrow(oversampling), replace=TRUE, prob=c(0.7,0.3))
+train <- oversampling[sample, ]
+validation <- oversampling[!sample, ]
+
+options(scipen=200)
+modelQ1 <- glm(as.factor(Credit_Score) ~ Outstanding_Debt + Amount_invested_monthly + Credit_Utilization_Ratio + Num_Credit_Inquiries + Delay_from_due_date + Num_Bank_Accounts, family = "binomial", data = train)
+
+predQ1 <- predict(modelQ1, validation, type = "response")
+summary(predQ1)
+predQ1_class <- ifelse(predQ1 > 0.7, 1, 0)
+confu <- table(validation$Credit_Score, predQ1_class)
+confu
+```
+Q7
+The difference is that the confusion matrix if the undersampling dataset is it only has true negative shown. It is probably caused by fixing the imbalanced problem by undersampling it by selecting the same number of Poor records as Good records. 
+```{r}
+undersampling <- creditTest[sample(which(creditTest$Credit_Score == 0), length(which((creditTest$Credit_Score == 1))), replace = TRUE),]
+
+set.seed(111)
+sample <- sample(c(TRUE, FALSE), nrow(undersampling), replace=TRUE, prob=c(0.7,0.3))
+train <- undersampling[sample, ]
+validation <- undersampling[!sample, ]
+
+options(scipen=200)
+modelQ1 <- glm(as.factor(Credit_Score) ~ Outstanding_Debt + Amount_invested_monthly + Credit_Utilization_Ratio + Num_Credit_Inquiries + Delay_from_due_date + Num_Bank_Accounts, family = "binomial", data = train)
+
+predQ1 <- predict(modelQ1, validation, type = "response")
+summary(predQ1)
+predQ1_class <- ifelse(predQ1 > 0.7, 1, 0)
+confu <- table(validation$Credit_Score, predQ1_class)
+confu
+```
+
+
+
+
+
+
+

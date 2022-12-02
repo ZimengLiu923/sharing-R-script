@@ -1,0 +1,115 @@
+---
+title: "DATA300 HW3"
+author: "Zimeng Liu"
+date: "2022-09-29"
+output: word_document
+---
+
+```{r}
+#install.packages("Quandl")
+library(Quandl)
+Quandl.api_key("8UaZbmxgvm6s398qsR8n")
+```
+
+## Q1
+```{r}
+stock_data <- Quandl.datatable("WIKI/PRICES",
+                              qopts.columns = c("date","close"),
+                              ticker = c("ADBE"),
+                              date.gte = c("2016-01-01"),
+                              date.lte = c("2017-12-31"))
+head(stock_data)
+```
+## Q2
+```{r}
+plot(stock_data$close)
+```
+The plot of the "close" column does not make sense to me, because it is not plotted in time order.
+
+## Q3
+```{r}
+stock_data_zoo <- zoo(stock_data$close, order.by = stock_data$date)
+plot(ts(stock_data_zoo))
+```
+## Q4
+```{r}
+data(EuStockMarkets)
+View(EuStockMarkets)
+plot(EuStockMarkets)
+```
+## Q5
+The trend of the plot is increasing, and has periodically change in a relatively short time. This dataset is not currently stationary.
+
+## Q6
+```{r}
+library(urca)
+urt <- ur.kpss(stock_data_zoo)
+summary(urt)
+```
+## Q7
+According to the Unit Root Test result, the test-statistic is much larger than critical values, so the data is not stationary.
+```{r}
+d1_stock_data_zoo <- diff(stock_data_zoo)
+```
+## Q8
+After taking differencing only once, according to the Unit Root Test result, the test-statistic is small than all of the critical values, so the (diff) data is stationary now.
+```{r}
+d1_urt <- ur.kpss(d1_stock_data_zoo)
+summary(d1_urt)
+```
+## Q9
+0 or 2, since the acf went outside of the blue dash lines at lag = 0 and lag = 2, meaning lag 0 and lag 2 are statistically significant and strongly correlated.
+```{r}
+acf(ts(d1_stock_data_zoo))
+```
+## Q10
+2, since the pacf went outside of the blue dash lines at lag = 2, meaning lag 2 are statistically significant and strongly correlated.
+```{r}
+pacf(ts(d1_stock_data_zoo))
+```
+## Q11
+We need to use pacf instead of acf here.
+```{r}
+ARmodel <- arima(ts(stock_data_zoo), order = c(2,1,0))
+ARmodel
+```
+## Q12
+```{r}
+predict(ARmodel, 10)
+```
+## Q13
+There is a 95% chance that the predictions will lay in the confidence interval I calculated.
+```{r}
+plot(ts(stock_data_zoo))
+AR_pred <- predict(ARmodel, 10)$pred
+AR_se <- predict(ARmodel ,10)$se
+points(AR_pred, type = "l", col = "Blue")
+points(AR_pred - 2*AR_se, type = "l", col = "Green", lty = 2)
+points(AR_pred + 2*AR_se, type = "l", col = "Green", lty = 2)
+```
+## Q14
+We need to use acf instead of pacf here.
+I tried both lag = 0 and lag = 2, according to the results, the aic at lag = 2 is smaller than aic at lag = 0, so I decided to use lag =2 as the MA model.
+There is a 95% chance that the predictions will lay in the confidence interval I calculated.
+```{r}
+MAmodel1 <- arima(ts(stock_data_zoo), order = c(0,1,0))
+MAmodel1
+MAmodel2 <- arima(ts(stock_data_zoo), order = c(0,1,2))
+MAmodel2
+predict(MAmodel2, 10)
+plot(ts(stock_data_zoo))
+MA_pred <- predict(MAmodel2, 10)$pred
+MA_se <- predict(MAmodel2 ,10)$se
+points(MA_pred, type = "l", col = "Blue")
+points(MA_pred - 2*MA_se, type = "l", col = "Green", lty = 2)
+points(MA_pred + 2*MA_se, type = "l", col = "Green", lty = 2)
+```
+## Q15
+The automodel is the best one, because the automodel has the lowest AIC among the models I have created.
+There is a 95% chance that the predictions will lay in the confidence interval I calculated.
+```{r}
+library(forecast)
+Automodel <- auto.arima(ts(stock_data_zoo))
+Automodel
+plot(forecast(Automodel,10))
+```

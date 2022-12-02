@@ -1,0 +1,109 @@
+---
+title: "HW4"
+author: "Zimeng Liu"
+date: "2022-10-13"
+output: word_document
+---
+Q1.
+Good and Standard
+```{r}
+library(dplyr)
+creditScore <- read.csv('C:\\Users\\Zimeng\\OneDrive - Dickinson College\\Desktop\\Dickinson\\7th\\DATA 300\\HW\\credit_score.csv')
+table(creditScore$Credit_Score)
+Poor_Good <- filter(creditScore, creditScore$Credit_Score %in% c("Good","Poor"))
+Poor_Good$Credit_Score <- factor(Poor_Good$Credit_Score, levels = c("Good","Poor"), labels=c(0,1))
+# levels(Poor_Good$Credit_Score)
+# View(Poor_Good)
+```
+Q2.
+I decide to include outstanding debt, amount invested monthly, credit utilization ratio, delay from due date, and number of bank account.
+```{r}
+Poor_Good <- na.omit(Poor_Good)
+
+is.numeric(Poor_Good$Outstanding_Debt)
+Poor_Good$Outstanding_Debt <- as.numeric(Poor_Good$Outstanding_Debt)
+is.numeric(Poor_Good$Outstanding_Debt)
+
+is.numeric(Poor_Good$Amount_invested_monthly)
+Poor_Good$Amount_invested_monthly <- as.numeric(Poor_Good$Amount_invested_monthly)
+is.numeric(Poor_Good$Amount_invested_monthly)
+
+is.numeric(Poor_Good$Credit_Utilization_Ratio)
+
+is.numeric(Poor_Good$Num_Credit_Inquiries)
+
+is.numeric(Poor_Good$Delay_from_due_date)
+
+is.numeric(Poor_Good$Num_Bank_Accounts)
+
+Poor_Good <- na.omit(Poor_Good)
+```
+Q3.
+In both train set and validation set, the distribution of Good class is about 37% and that of Poor class is about 63%.
+```{r}
+set.seed(111)
+sample <- sample(c(TRUE, FALSE), nrow(Poor_Good), replace=TRUE, prob=c(0.7,0.3))
+train <- Poor_Good[sample, ]
+validation <- Poor_Good[!sample, ]
+
+prop.table(table(train$Credit_Score))
+prop.table(table(validation$Credit_Score))
+```
+Q4.
+```{r}
+options(scipen=200)
+model1 <- glm(as.factor(Credit_Score) ~ Outstanding_Debt + Amount_invested_monthly + Credit_Utilization_Ratio + Num_Credit_Inquiries + Delay_from_due_date + Num_Bank_Accounts, family = "binomial", data = train)
+summary(model1)
+```
+Q5.
+For Outstanding_Debt, the coefficient means that every unit change in Outstanding_Debt, the log-odds change by 0.00120700.
+
+Q6.
+The worst mistake for a bank is to take a client with a poor credit score as a client with a good credit score. Thus, I choose to use False omission rate (FOR) to evaluate this model. FN/PN = 3323/(3323+1307) = 0.718.
+```{r}
+pred1 <- predict(model1, validation, type = "response")
+summary(pred1)
+pred1_class <- ifelse(pred1 > 0.63, 1, 0)
+table(validation$Credit_Score, pred1_class)
+```
+Q7.
+My LDA function actually ran pretty fast.
+```{r}
+library(MASS)
+model2 <- lda(as.factor(Credit_Score) ~ Outstanding_Debt + Amount_invested_monthly + 
+    Credit_Utilization_Ratio + Num_Credit_Inquiries + Delay_from_due_date + Num_Bank_Accounts, data = train)
+model2
+pred2 <- predict(model2, validation)
+```
+Q8.
+```{r}
+model3 <- qda(as.factor(Credit_Score) ~ Outstanding_Debt + Amount_invested_monthly + 
+    Credit_Utilization_Ratio + Num_Credit_Inquiries + Delay_from_due_date + Num_Bank_Accounts, data = train)
+model3
+pred3 <- predict(model3, validation)
+```
+Q9.
+```{r}
+library(pROC)
+plot(roc(validation$Credit_Score, pred1),col = "yellow")
+plot(roc(validation$Credit_Score, pred2$posterior[,-1], add=TRUE), col = "blue")
+plot(roc(validation$Credit_Score, pred3$posterior[,-1], add=TRUE), col = "green")
+```
+Q10.
+Thus, I choose to use False omission rate (FOR) to evaluate this model. FN/PN = 3322/(3322+1307) = 0.718.
+```{r}
+thre <- seq(0.1, 0.9, 0.1)
+forList <- 0
+
+for (i in thre){
+  pred_class <- ifelse(pred1 > i, 1, 0)
+  confu <- table(validation$Credit_Score, pred_class)
+  false_omission_rate <- confu[1,1]/length(which(validation$Credit_Score == 0)) 
+  forList <- c(forList, false_omission_rate)
+  print(confu)
+}
+
+length(thre)
+length(forList)
+plot(thre,forList[-1])
+```
